@@ -4,7 +4,7 @@
 
 [![Status](https://img.shields.io/badge/status-active-success.svg)](https://github.com/Aborgh/pw)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![GitHub release](https://img.shields.io/github/v/release/Aborgh/pw?color=blue&include_prereleases)](https://github.com/Aborgh/pw/releases)
+[![GitHub release](https://img.shields.io/github/v/release/Aborgh/pw?color=blue)](https://github.com/Aborgh/pw/releases)
 
   <img src="assets/demo.gif" alt="pw demo">
 
