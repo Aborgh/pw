@@ -1,19 +1,39 @@
 # PW - Easy-to-Remember Password Generator
 
-A command-line tool for generating random English-sounding words. Some words *may* be real words, but that's completely by chance. 
+<div align="center">
 
-## Features
+[![Status](https://img.shields.io/badge/status-active-success.svg)](https://github.com/Aborgh/pw)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![GitHub release](https://img.shields.io/github/v/release/Aborgh/pw?color=blue&include_prereleases)](https://github.com/Aborgh/pw/releases)
 
-- Creates passwords with a mix of words, numbers, and special characters
-- Customize password length or use length ranges
-- Control capitalization options
-- Generate multiple passwords at once
-- Define custom patterns for password generation
-- Output in plain text, JSON, or YAML formats
-- Encode passwords in various formats (Base64, URL, SHA256, SHA512, htpasswd)
-- Use a specific seed for reproducible passwords
+  <img src="assets/demo.gif" alt="pw demo">
 
-## Installation
+*A command-line tool for generating random English-sounding words. Some words **may** be real words, but that's
+completely by chance.*
+</div>
+
+## ✨ Features
+
+<table>
+  <tr>
+    <td>✅ Creates passwords with a mix of words, numbers, and special characters</td>
+    <td>✅ Customize password length or use length ranges</td>
+  </tr>
+  <tr>
+    <td>✅ Control capitalization options</td>
+    <td>✅ Generate multiple passwords at once</td>
+  </tr>
+  <tr>
+    <td>✅ Define custom patterns for password generation</td>
+    <td>✅ Output in plain text, JSON, or YAML formats</td>
+  </tr>
+  <tr>
+    <td>✅ Encode passwords in various formats (Base64, URL, SHA256, SHA512, htpasswd)</td>
+    <td>✅ Use a specific seed for reproducible passwords</td>
+  </tr>
+</table>
+
+## 📦 Installation
 
 ### Install (Linux/macOS)
 
@@ -46,7 +66,7 @@ cargo install --path .
 
 Pre-compiled binaries for various platforms are available on the [releases page](https://github.com/Aborgh/pw/releases).
 
-## Usage
+## 🚀 Usage
 
 ### Basic Usage
 
@@ -117,12 +137,16 @@ pw -p "'cool'-W-'cool'" # Will generate "cool-RANDOM_WORD-cool"
 ```
 
 #### Pattern Characters:
+
 - `W` or `w`: Word
 - `N` or `n`: Number
 - `C`, `c`, `S` or `s`: Special Character
 - Any other character: Literal
-- Text in quotes: Literal text (e.g., `"hello-"W`). Note that words with characters: `W` `S` `C` or `N` needs to be surrounded with `''`. I.e.: `pw -p "'cool'-WW-'stuff'"` 
-- If used with `--length (-L)` the length parameter will be on the word. For instance: `pw -p "hello-"W -L 2` would generate `hello-si` or some other random 2-letter word 
+- Text in quotes: Literal text (e.g., `"hello-"W`). Note that words with characters: `W` `S` `C` or `N` needs to be
+  surrounded with `''`. I.e.: `pw -p "'cool'-WW-'stuff'"`
+- If used with `--length (-L)` the length parameter will be on the word. For instance: `pw -p "hello-"W -L 2` would
+  generate `hello-si` or some other random 2-letter word
+
 ### JSON Output
 
 ```bash
@@ -139,7 +163,13 @@ pw --output json --encode base64
 pw -O json -e base64
 ```
 
-Available encodings: `base64`, `url`, `sha256`, `sha512`, `htpasswd`
+| Available Encodings |
+  |:-------------------:|
+|      `base64`       |
+|        `url`        |
+|      `sha256`       |
+|      `sha512`       |
+|     `htpasswd`      |
 
 ### Deterministic Output
 
@@ -161,21 +191,31 @@ pw --random
 pw -R
 ```
 
-## Examples
+## 📋 Examples
 
-```bash
-# Generate 3 passwords with length 15, all lowercase
-pw 3 -L --lowercase
-# Generate a password with pattern
-pw --pattern "W-N-C-W"
+<table>
+  <tr>
+    <th>Command</th>
+    <th>Description</th>
+  </tr>
+  <tr>
+    <td><code>pw 3 -L --lowercase</code></td>
+    <td>Generate 3 passwords with length 15, all lowercase</td>
+  </tr>
+  <tr>
+    <td><code>pw --pattern "W-N-C-W"</code></td>
+    <td>Generate a password with pattern</td>
+  </tr>
+  <tr>
+    <td><code>pw -O json --encode sha256</code></td>
+    <td>Generate a JSON output with SHA256 encoding</td>
+  </tr>
+  <tr>
+    <td><code>pw -p "'my-'W'@'N"</code></td>
+    <td>Generate a fixed pattern with literal text</td>
+  </tr>
+</table>
 
-# Generate a JSON output with SHA256 encoding
-pw -O json --encode sha256
-
-# Generate a fixed pattern with literal text
-pw -p "'my-'W'@'N"
-```
-
-## License
+## 📄 License
 
 This project is licensed under the MIT License
