@@ -6,7 +6,6 @@ mod models;
 use crate::cli::cli::{Cli, EncodingFormat, OutputFormat};
 use crate::generator::password::{
     generate_password_with_target_length, generate_pattern_password, random_chars,
-    random_uppercase_char,
 };
 use crate::helper::encoder::encode_password;
 use crate::models::password_output::PasswordOutput;
@@ -14,8 +13,9 @@ use anyhow::{Context, Result};
 use clap::error::ErrorKind;
 use clap::{CommandFactory, Parser};
 use rand::SeedableRng;
-use rand_chacha::ChaCha8Rng;
 use rand_chacha::rand_core::TryRngCore;
+use rand_chacha::ChaCha8Rng;
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
     command_validation(&cli);
@@ -56,12 +56,7 @@ fn main() -> Result<()> {
         } else {
             generate_password_with_target_length(&mut rng, min_length, max_length, cli.capitalize)?
         };
-
-        if !cli.random {
-            if !cli.capitalize && !cli.lowercase {
-                password = random_uppercase_char(&password, &mut rng);
-            }
-        }
+        
 
         if cli.lowercase {
             password = password.to_lowercase();
@@ -142,5 +137,103 @@ fn command_validation(cli: &Cli) {
             "Minimum length must be greater than 0",
         )
         .exit();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rand::{Rng, SeedableRng};
+    use rand_chacha::ChaCha8Rng;
+
+    #[test]
+    fn test_password_uniqueness() {
+        // Isn't true random
+        let random_int = ChaCha8Rng::from_os_rng().try_next_u64().unwrap();
+        let mut rng = ChaCha8Rng::seed_from_u64(random_int);
+        let mut passwords: Vec<String> = Vec::new();
+
+        let min = rng.random_range(5..8);
+        let max = rng.random_range(min..15);
+        
+        for _ in 0..1000 {
+            let password = generate_password_with_target_length(&mut rng, min, max, false);
+            passwords.push(password.unwrap());
+        }
+
+        for i in 0..passwords.len() {
+            let current_password = &passwords[i];
+            for j in (i + 1)..passwords.len() {
+                let other_password = &passwords[j];
+                assert_ne!(
+                    current_password,
+                    other_password,
+                    "Found duplicate passwords at positions {} and {}: '{}'",
+                    i, j, current_password
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_password_substring_containment() {
+        let mut rng = ChaCha8Rng::from_seed([0; 32]);
+        let mut passwords: Vec<String> = Vec::new();
+
+        for _ in 0..1000 {
+            let password = generate_password_with_target_length(&mut rng, 8, 15, false);
+            passwords.push(password.unwrap());
+        }
+
+        for i in 0..passwords.len() {
+            let current_password = &passwords[i];
+            for j in 0..passwords.len() {
+                if i != j {
+                    let other_password = &passwords[j];
+                    assert!(
+                        !other_password.contains(current_password),
+                        "Password at position {} ('{}') is contained within password at position {} ('{}')",
+                        i, current_password, j, other_password
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_combined_password_uniqueness_and_containment() {
+        let mut rng = ChaCha8Rng::from_seed([0; 32]);
+        let mut passwords: Vec<String> = Vec::new();
+
+        for _ in 0..1000 {
+            let password = generate_password_with_target_length(&mut rng, 8, 15, false);
+            passwords.push(password.unwrap());
+        }
+
+        for i in 0..passwords.len() {
+            let current_password = &passwords[i];
+            for j in (i + 1)..passwords.len() {
+                let other_password = &passwords[j];
+
+                assert_ne!(
+                    current_password,
+                    other_password,
+                    "Found duplicate passwords at positions {} and {}: '{}'",
+                    i, j, current_password
+                );
+
+                assert!(
+                    !current_password.contains(other_password),
+                    "Password at position {} ('{}') contains password at position {} ('{}')",
+                    i, current_password, j, other_password
+                );
+
+                assert!(
+                    !other_password.contains(current_password),
+                    "Password at position {} ('{}') contains password at position {} ('{}')",
+                    j, other_password, i, current_password
+                );
+            }
+        }
     }
 }

@@ -20,8 +20,9 @@ pub fn generate_password_with_target_length(
     let start_with_word = rng.random_bool(0.7);
 
     let special_char = get_random_special_chars(rng, 1);
-    components.push(special_char.clone());
-    remaining_length = remaining_length.saturating_sub(special_char.len());
+    let special_char_len = special_char.len();
+    components.push(special_char);
+    remaining_length = remaining_length.saturating_sub(special_char_len);
 
     let num_digits = rng.random_range(1..=3);
     let max_val = 10usize.pow(num_digits as u32) - 1;
@@ -30,13 +31,14 @@ pub fn generate_password_with_target_length(
     } else {
         0
     };
-    let number = rng.random_range(min_val..=max_val).to_string();
-    components.push(number.clone());
-    remaining_length = remaining_length.saturating_sub(number.len());
+    let random_number_string = rng.random_range(min_val..=max_val).to_string();
+    let random_number_string_len = random_number_string.len();
+    components.push(random_number_string);
+    remaining_length = remaining_length.saturating_sub(random_number_string_len);
 
     if remaining_length >= 3 {
         let num_words = if remaining_length >= 8 { 2 } else { 1 };
-
+        let random_word_to_capitalize = rng.random_range(0..num_words);
         for i in 0..num_words {
             let is_last_word = i == num_words - 1;
 
@@ -51,16 +53,20 @@ pub fn generate_password_with_target_length(
                 break;
             }
 
-            let word = generate_random_word(word_min_length, word_max_length, rng);
-
+            let mut word = generate_random_word(word_min_length, word_max_length, rng);
+            if i == random_word_to_capitalize {
+                word = capitalize(&word)
+            }
             let word = if force_capitalize {
                 capitalize(&word)
             } else {
                 word
             };
 
-            components.push(word.clone());
-            remaining_length = remaining_length.saturating_sub(word.len());
+            let word_length = word.len();
+            components.push(word);
+
+            remaining_length = remaining_length.saturating_sub(word_length);
 
             if remaining_length < 3 {
                 break;
@@ -86,18 +92,12 @@ pub fn generate_password_with_target_length(
     // Shuffle everything
     if start_with_word {
         // Find word
-        let word_indices: Vec<usize> = components
-            .iter()
-            .enumerate()
-            .filter(|(_, component)| component.chars().any(|c| c.is_alphabetic()))
-            .map(|(i, _)| i)
-            .collect();
+        let word_indices = select_random_word(&mut components);
 
         if !word_indices.is_empty() {
             // Select a random word
             let word_idx = word_indices[rng.random_range(0..word_indices.len())];
             let word_component = components[word_idx].clone();
-
             // Remove it and place it at the beginning
             components.remove(word_idx);
             components.shuffle(rng);
@@ -122,8 +122,19 @@ pub fn generate_password_with_target_length(
     Ok(password)
 }
 
+fn select_random_word(components: &mut Vec<String>) -> Vec<usize> {
+    let word_indices: Vec<usize> = components
+        .iter()
+        .enumerate()
+        .filter(|(_, component)| component.chars().any(|c| c.is_alphabetic()))
+        .map(|(i, _)| i)
+        .collect();
+    word_indices
+}
+
 pub fn get_random_special_chars(rng: &mut ChaCha8Rng, count: usize) -> String {
-    let special_chars = "!@#$%^&*()-_=+[]{}|;:,.<>?~";
+    // Some chars should have higher probability
+    let special_chars = "!!!!!!!!@@@#$%^&*()-----_____=+[]{}|;:,.<>?????????~";
     let mut result = String::with_capacity(count);
 
     for _ in 0..count {
@@ -234,18 +245,6 @@ pub fn generate_pattern_password(
     }
 
     Ok(components.join(""))
-}
-
-pub fn random_uppercase_char(word: &str, rng: &mut ChaCha8Rng) -> String {
-    let mut final_word = String::with_capacity(word.len());
-    for c in word.chars() {
-        if c.is_alphabetic() & rng.random_bool(0.1) {
-            final_word.push(c.to_ascii_uppercase())
-        } else {
-            final_word.push(c);
-        }
-    }
-    final_word
 }
 
 pub fn random_chars(rng: &mut ChaCha8Rng, minimum_length: usize, maximum_length: usize) -> String {
