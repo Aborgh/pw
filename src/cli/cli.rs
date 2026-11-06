@@ -22,7 +22,7 @@ pub struct Cli {
     #[arg(default_value = "1")]
     pub number_of_passwords: usize,
     
-    /// Set a fixed length instead of using -m and -M
+    /// Set a fixed length instead of using -m and -M (at least 12)
     #[arg(short = 'L', long)]
     pub length: Option<usize>,
 
@@ -34,11 +34,11 @@ pub struct Cli {
     #[arg(short = 'R', long, default_value = "false")]
     pub random: bool,
     
-    /// Minimum word length
+    /// Minimum length. Default 12 (with --pattern: word length, default 8)
     #[arg(short, long)]
     pub min_length: Option<usize>,
 
-    /// Maximum word length
+    /// Maximum length. Default 20 (with --pattern: word length, default 15)
     #[arg(short = 'M', long)]
     pub max_length: Option<usize>,
 
@@ -46,7 +46,7 @@ pub struct Cli {
     #[arg(short = 'O', long = "output", default_value = "text")]
     pub format: OutputFormat,
 
-    /// Use seed for deterministic output, will be deterministic for multiple passwords
+    /// Use seed for deterministic output. Anyone with the seed can recreate the passwords
     #[arg(short, long)]
     pub seed: Option<u64>,
 
@@ -54,7 +54,7 @@ pub struct Cli {
     #[arg(short, long)]
     pub capitalize: bool,
 
-    /// Will print the seed
+    /// Print the seed (only reproducible when --seed is used)
     #[arg(short, long)]
     pub verbose: bool,
     /// Pattern for password generation (W=Word, N=Number, C/S=Special Character). Use single or double quotes for fixed characters.

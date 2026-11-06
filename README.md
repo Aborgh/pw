@@ -96,13 +96,15 @@ pw -L 12
 
 ### Set Length Range
 
-Generate a password between 10 and 16 characters:
+Generate a password between 14 and 20 characters:
 
 ```bash
-pw --min-length 10 --max-length 16
+pw --min-length 14 --max-length 20
 #or
-pw -m 10 -M 16
+pw -m 14 -M 20
 ```
+
+Passwords are 12 to 20 characters by default. The minimum allowed length is 12.
 
 ### Force Lowercase
 
@@ -146,6 +148,8 @@ pw -p "'cool'-W-'cool'" # Will generate "cool-RANDOM_WORD-cool"
   surrounded with `''`. I.e.: `pw -p "'cool'-WW-'stuff'"`
 - If used with `--length (-L)` the length parameter will be on the word. For instance: `pw -p "hello-"W -L 2` would
   generate `hello-si` or some other random 2-letter word
+- Words longer than 9 letters are split into shorter words joined by a digit or symbol. For instance: `pw -p W -L 15`
+  could generate `mosolen7bailoon`
 
 ### JSON Output
 
@@ -180,6 +184,9 @@ pw --seed 12345
 # or
 pw -s 12345
 ```
+
+> ⚠️ Anyone who knows the seed can recreate the passwords. Without `--seed`, passwords come from your operating system's
+> secure randomness and cannot be reproduced.
 
 ### Completely Random Password
 

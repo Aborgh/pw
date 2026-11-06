@@ -1,164 +1,73 @@
-use crate::generator::word::{capitalize, generate_random_word};
+use crate::generator::word::{capitalize, capitalize_first, generate_random_word};
 use anyhow::{Result, anyhow};
 use rand::Rng;
 use rand::distr::{Alphanumeric, SampleString};
 use rand::prelude::SliceRandom;
-use rand_chacha::ChaCha8Rng;
 
+const SYMBOLS: &[u8] = b"!@#$%^&*()-_=+[]{}|;:,.<>?~";
+
+// A password is: words (split by digits or symbols) + a number + a symbol
+// Example: "Tornek7mely42!"
 pub fn generate_password_with_target_length(
-    rng: &mut ChaCha8Rng,
+    rng: &mut impl Rng,
     min_length: usize,
     max_length: usize,
     force_capitalize: bool,
 ) -> Result<String> {
-    let target_length = rng.random_range(min_length..=max_length);
+    let length = rng.random_range(min_length..=max_length);
 
-    let mut remaining_length = target_length;
+    let number = random_number(rng);
+    let symbol = random_symbol(rng).to_string();
 
-    let mut components = Vec::new();
+    let words_length = length.saturating_sub(number.len() + 1);
+    if words_length == 0 {
+        return Err(anyhow!("Password length {length} is too short"));
+    }
 
-    let start_with_word = rng.random_bool(0.7);
-
-    let special_char = get_random_special_chars(rng, 1);
-    let special_char_len = special_char.len();
-    components.push(special_char);
-    remaining_length = remaining_length.saturating_sub(special_char_len);
-
-    let num_digits = rng.random_range(1..=3);
-    let max_val = 10usize.pow(num_digits as u32) - 1;
-    let min_val = if num_digits > 1 {
-        10usize.pow((num_digits - 1) as u32)
+    let words = generate_random_word(words_length, words_length, rng);
+    let words = if force_capitalize {
+        capitalize(&words)
     } else {
-        0
+        capitalize_first(&words)
     };
-    let random_number_string = rng.random_range(min_val..=max_val).to_string();
-    let random_number_string_len = random_number_string.len();
-    components.push(random_number_string);
-    remaining_length = remaining_length.saturating_sub(random_number_string_len);
 
-    if remaining_length >= 3 {
-        let num_words = if remaining_length >= 8 { 2 } else { 1 };
-        let random_word_to_capitalize = rng.random_range(0..num_words);
-        for i in 0..num_words {
-            let is_last_word = i == num_words - 1;
-
-            let word_min_length = 3;
-            let word_max_length = if is_last_word {
-                remaining_length
-            } else {
-                remaining_length.saturating_sub(3).min(9)
-            };
-
-            if word_max_length < word_min_length {
-                break;
-            }
-
-            let mut word = generate_random_word(word_min_length, word_max_length, rng);
-            if i == random_word_to_capitalize {
-                word = capitalize(&word)
-            }
-            let word = if force_capitalize {
-                capitalize(&word)
-            } else {
-                word
-            };
-
-            let word_length = word.len();
-            components.push(word);
-
-            remaining_length = remaining_length.saturating_sub(word_length);
-
-            if remaining_length < 3 {
-                break;
-            }
-        }
-    }
-
-    // These will always run if --length is 1 or 2
-    if remaining_length >= 2 {
-        if rng.random_bool(0.5) {
-            // Add another number
-            let remaining_digits = remaining_length.min(3);
-            let max_val = 10usize.pow(remaining_digits as u32) - 1;
-            let number = rng.random_range(0..=max_val).to_string();
-            components.push(number);
-        } else {
-            // Add more special characters
-            let special = get_random_special_chars(rng, remaining_length);
-            components.push(special);
-        }
-    }
-
-    // Shuffle everything
-    if start_with_word {
-        // Find word
-        let word_indices = select_random_word(&mut components);
-
-        if !word_indices.is_empty() {
-            // Select a random word
-            let word_idx = word_indices[rng.random_range(0..word_indices.len())];
-            let word_component = components[word_idx].clone();
-            // Remove it and place it at the beginning
-            components.remove(word_idx);
-            components.shuffle(rng);
-            components.insert(0, word_component);
-        } else {
-            // No word components found, shuffle everything
-            components.shuffle(rng);
-        }
+    // Most passwords start with the words, the rest are fully mixed
+    let mut parts = vec![number, symbol];
+    parts.shuffle(rng);
+    if rng.random_bool(0.7) {
+        parts.insert(0, words);
     } else {
-        // Randomize order
-        components.shuffle(rng);
+        let position = rng.random_range(0..=parts.len());
+        parts.insert(position, words);
     }
 
-    // Combine components into a password
-    let password = components.join("");
-
-    // Verify the password meets our length requirements
-    if password.len() < min_length || password.len() > max_length {
-        return generate_password_with_target_length(rng, min_length, max_length, force_capitalize);
-    }
-
-    Ok(password)
+    Ok(parts.join(""))
 }
 
-fn select_random_word(components: &mut Vec<String>) -> Vec<usize> {
-    let word_indices: Vec<usize> = components
-        .iter()
-        .enumerate()
-        .filter(|(_, component)| component.chars().any(|c| c.is_alphabetic()))
-        .map(|(i, _)| i)
-        .collect();
-    word_indices
+// A number with 1 to 3 digits
+fn random_number(rng: &mut impl Rng) -> String {
+    let digits = rng.random_range(1..=3);
+    let smallest = if digits == 1 { 0 } else { 10usize.pow(digits - 1) };
+    let largest = 10usize.pow(digits) - 1;
+
+    rng.random_range(smallest..=largest).to_string()
 }
 
-pub fn get_random_special_chars(rng: &mut ChaCha8Rng, count: usize) -> String {
-    // Some chars should have higher probability
-    let special_chars = "!!!!!!!!@@@#$%^&*()-----_____=+[]{}|;:,.<>?????????~";
-    let mut result = String::with_capacity(count);
-
-    for _ in 0..count {
-        let random_special_char_id = rng.random_range(0..=special_chars.len());
-        if let Some(c) = special_chars.chars().nth(random_special_char_id) {
-            result.push(c);
-        }
-    }
-
-    result
+pub fn random_symbol(rng: &mut impl Rng) -> char {
+    let index = rng.random_range(0..SYMBOLS.len());
+    SYMBOLS[index] as char
 }
 
-/// Generate a password based on a specific pattern
-/// W = Word, N = Number, C/S = Special Character
-/// "text" or 'text' = Literal text to include
-/// Generate a password based on a specific pattern
-/// W = Word, N = Number, C/S = Special Character
-/// "text" or 'text' = Literal text to include at that position
+pub fn get_random_special_chars(rng: &mut impl Rng, count: usize) -> String {
+    (0..count).map(|_| random_symbol(rng)).collect()
+}
+
 /// Generate a password based on a specific pattern
 /// W = Word, N = Number, C/S = Special Character
 /// Any other character = Literal character (no quotes needed)
 /// "text" or 'text' = Optional quoted literal text
 pub fn generate_pattern_password(
-    rng: &mut ChaCha8Rng,
+    rng: &mut impl Rng,
     pattern: &str,
     min_word_length: usize,
     max_word_length: usize,
@@ -225,15 +134,7 @@ pub fn generate_pattern_password(
                 components.push(word);
             }
             'N' | 'n' => {
-                let num_digits = rng.random_range(1..=3);
-                let max_val = 10usize.pow(num_digits as u32) - 1;
-                let min_val = if num_digits > 1 {
-                    10usize.pow((num_digits - 1) as u32)
-                } else {
-                    0
-                };
-                let number = rng.random_range(min_val..=max_val).to_string();
-                components.push(number);
+                components.push(random_number(rng));
             }
             'C' | 'c' | 'S' | 's' => {
                 components.push(get_random_special_chars(rng, 1));
@@ -247,15 +148,13 @@ pub fn generate_pattern_password(
     Ok(components.join(""))
 }
 
-pub fn random_chars(rng: &mut ChaCha8Rng, minimum_length: usize, maximum_length: usize) -> String {
+pub fn random_chars(rng: &mut impl Rng, minimum_length: usize, maximum_length: usize) -> String {
     let mut password = String::new();
-    let special_chars = "!@#$%^&*()-_=+[]{}|;:,.<>?~";
     let password_length = rng.random_range(minimum_length..=maximum_length);
 
     for _ in 0..password_length {
-        let special_char_index = rng.random_range(0..special_chars.len());
         if rng.random_bool(0.1) {
-            password.push(special_chars.chars().nth(special_char_index).unwrap());
+            password.push(random_symbol(rng));
         } else {
             password.push(Alphanumeric.sample_string(rng, 1).chars().nth(0).unwrap());
         }

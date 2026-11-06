@@ -9,40 +9,34 @@ use crate::generator::password::{
 };
 use crate::helper::encoder::encode_password;
 use crate::models::password_output::PasswordOutput;
-use anyhow::{Context, Result};
+use anyhow::Result;
 use clap::error::ErrorKind;
 use clap::{CommandFactory, Parser};
 use rand::SeedableRng;
-use rand_chacha::rand_core::TryRngCore;
-use rand_chacha::ChaCha8Rng;
+use rand_chacha::ChaCha20Rng;
+
+const MIN_PASSWORD_LENGTH: usize = 12;
+const MAX_PASSWORD_LENGTH: usize = 20;
+
+// With --pattern, the lengths apply to each word instead
+const MIN_WORD_LENGTH: usize = 8;
+const MAX_WORD_LENGTH: usize = 15;
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
-    command_validation(&cli);
+    let (min_length, max_length) = length_range(&cli);
+    command_validation(&cli, min_length, max_length);
 
     let mut rng = match cli.seed {
-        Some(seed) => {
-            if cli.verbose {
-                println!("Seed: {}", seed);
-            }
-            ChaCha8Rng::seed_from_u64(seed)
-        },
-        None => {
-            let random_seed = ChaCha8Rng::from_os_rng()
-                .try_next_u64()
-                .context("Failed to generate random seed")?;
-            if cli.verbose {
-                println!("Seed: {}", random_seed);
-            }
-            ChaCha8Rng::seed_from_u64(random_seed)
-        }
+        Some(seed) => ChaCha20Rng::seed_from_u64(seed),
+        None => ChaCha20Rng::from_os_rng(),
     };
 
-    let mut min_length = cli.min_length.unwrap_or(8);
-    let mut max_length = cli.max_length.unwrap_or(15);
-    if let Some(length) = cli.length {
-        min_length = length;
-        max_length = length;
+    if cli.verbose {
+        match cli.seed {
+            Some(seed) => println!("Seed: {}", seed),
+            None => println!("Seed: none (random, not reproducible)"),
+        }
     }
 
     let num_passwords = cli.number_of_passwords;
@@ -95,7 +89,23 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn command_validation(cli: &Cli) {
+fn length_range(cli: &Cli) -> (usize, usize) {
+    if let Some(length) = cli.length {
+        return (length, length);
+    }
+
+    let (default_min, default_max) = if cli.pattern.is_some() {
+        (MIN_WORD_LENGTH, MAX_WORD_LENGTH)
+    } else {
+        (MIN_PASSWORD_LENGTH, MAX_PASSWORD_LENGTH)
+    };
+
+    let min_length = cli.min_length.unwrap_or(default_min);
+    let max_length = cli.max_length.unwrap_or(default_max);
+    (min_length, max_length)
+}
+
+fn command_validation(cli: &Cli, min_length: usize, max_length: usize) {
     let mut cmd = Cli::command();
 
     if matches!(cli.format, OutputFormat::Text) && !matches!(cli.encode, EncodingFormat::None) {
@@ -115,7 +125,7 @@ fn command_validation(cli: &Cli) {
         ).exit();
     }
 
-    if cli.min_length > cli.max_length {
+    if min_length > max_length {
         cmd.error(
             ErrorKind::ValueValidation,
             "Minimum length cannot be greater than maximum length",
@@ -131,10 +141,18 @@ fn command_validation(cli: &Cli) {
         .exit();
     }
 
-    if cli.min_length.is_some() && cli.min_length.unwrap() < 1 {
+    if min_length < 1 {
         cmd.error(
             ErrorKind::ValueValidation,
             "Minimum length must be greater than 0",
+        )
+        .exit();
+    }
+
+    if cli.pattern.is_none() && min_length < MIN_PASSWORD_LENGTH {
+        cmd.error(
+            ErrorKind::ValueValidation,
+            format!("Passwords must be at least {MIN_PASSWORD_LENGTH} characters long"),
         )
         .exit();
     }
@@ -143,14 +161,12 @@ fn command_validation(cli: &Cli) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::{Rng, SeedableRng};
-    use rand_chacha::ChaCha8Rng;
+    use crate::generator::password::get_random_special_chars;
+    use rand::Rng;
 
     #[test]
     fn test_password_uniqueness() {
-        // Isn't true random
-        let random_int = ChaCha8Rng::from_os_rng().try_next_u64().unwrap();
-        let mut rng = ChaCha8Rng::seed_from_u64(random_int);
+        let mut rng = ChaCha20Rng::from_os_rng();
         let mut passwords: Vec<String> = Vec::new();
 
         let min = rng.random_range(5..8);
@@ -177,7 +193,7 @@ mod tests {
 
     #[test]
     fn test_password_substring_containment() {
-        let mut rng = ChaCha8Rng::from_seed([0; 32]);
+        let mut rng = ChaCha20Rng::from_seed([0; 32]);
         let mut passwords: Vec<String> = Vec::new();
 
         for _ in 0..1000 {
@@ -202,7 +218,7 @@ mod tests {
 
     #[test]
     fn test_combined_password_uniqueness_and_containment() {
-        let mut rng = ChaCha8Rng::from_seed([0; 32]);
+        let mut rng = ChaCha20Rng::from_seed([0; 32]);
         let mut passwords: Vec<String> = Vec::new();
 
         for _ in 0..1000 {
@@ -234,6 +250,33 @@ mod tests {
                     j, other_password, i, current_password
                 );
             }
+        }
+    }
+
+    #[test]
+    fn test_symbols_are_never_skipped() {
+        let mut rng = ChaCha20Rng::from_seed([0; 32]);
+
+        for _ in 0..10_000 {
+            assert_eq!(get_random_special_chars(&mut rng, 3).len(), 3);
+        }
+    }
+
+    #[test]
+    fn test_default_passwords_have_a_symbol() {
+        let mut rng = ChaCha20Rng::from_seed([0; 32]);
+
+        for _ in 0..1000 {
+            let password = generate_password_with_target_length(
+                &mut rng,
+                MIN_PASSWORD_LENGTH,
+                MAX_PASSWORD_LENGTH,
+                false,
+            )
+            .unwrap();
+
+            let has_symbol = password.chars().any(|c| !c.is_alphanumeric());
+            assert!(has_symbol, "No symbol in '{}'", password);
         }
     }
 }
